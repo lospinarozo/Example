@@ -18,6 +18,7 @@ editor_options:
 
 This is an example to generate RMarkdown documents, and some types of figures and analysis that can be produced with R.
 
+
 <br>
 <br>
 
@@ -38,6 +39,7 @@ The first part of the RMarkdown code defines the properties of your web page. Fo
 ## Packages
 
 Always include a list of the packages used in the code and even better to include the versions. Note I have already installed all these packages. And the code is used only to "activate them"
+
 
 ```{r message=FALSE, warning=FALSE}
 # Import and process spectral data
@@ -89,6 +91,7 @@ BeetD2<-getspec(
   ext = "txt", # extension of the files
   lim = c(450, 700), # limits
   decimal = ".")
+
 ```
 *warning! models with this data are not reliable since we did not get values below 340nm
 
@@ -97,6 +100,7 @@ BeetD2<-getspec(
 # Change the names of the columns
 # first column, wavelength should always be "wl"
 names(BeetD2)<-c("wl","EpiLamp","CalFren","AnoAure","AnoLaeG")
+tail(BeetD2)
 ```
 
 
@@ -106,9 +110,17 @@ BeetD1 <- BeetD1 %>%
   as.rspec() %>% # convert to an r spec file
   procspec(.,fixneg="zero") # Fix negatives
 
+procspec(as.rspec(BeetD1),fixneg="zero")
+
 BeetD2 <- BeetD2 %>% 
   as.rspec() %>% # convert to an r spec file
   procspec(.,fixneg="zero") # Fix negatives
+
+BeetD3 <- procspec(BeetD2,opt="smooth", span=0.1)
+
+plot(BeetD2$wl,BeetD2$AnoAure, type="l")
+lines(BeetD3$wl,BeetD3$AnoAure,  col="blue")
+
 ```
 
 note: a smoothing function can also be applied if needed with "opt" and the numbers "span".
@@ -122,11 +134,11 @@ explorespec(BeetD2)
 # Use this to produce a plot 
 ggplot(data = BeetD2) +
   geom_line(aes(wl, AnoAure), col="blue")+
-  geom_line(aes(wl, EpiLamp), col="green")+
-  geom_line(aes(wl, CalFren), col="red")+
+  theme_bw() +
   xlab("Wavelength (nm)")+
   ylab("Reflectance (%)")+
-  theme_bw()
+  geom_line(aes(wl, EpiLamp), col="green")+
+  geom_line(aes(wl, CalFren), col="red")
 
 # An extra rearrange of data is needed to automatically include a legend.
 
@@ -138,6 +150,7 @@ Sometimes it is useful to identify the maximum wavelength (H1), or the area unde
 
 ```{r}
 summary(BeetD2)
+peakshape(BeetD2[,c(1,2)])
 ```
 
 Note: We advocate for the use of the spectral location (i.e. The wavelength at which reflectance is half of the maximum, nm ) instead of the maximum wavelength (sometimes called Hue).

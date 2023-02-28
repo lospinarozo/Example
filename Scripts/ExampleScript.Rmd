@@ -1,0 +1,287 @@
+---
+title: "Example"
+author: "Laura Ospina-Rozo"
+date: '2023-01-28'
+output:
+  html_document: 
+    toc: yes
+    toc_float: yes
+    toc_depth: 5
+    highlight: tango
+    theme: paper
+    self_contained: yes
+    mode: selfcontained
+    code_folding: hide
+editor_options: 
+  chunk_output_type: console
+---
+
+This is an example to generate RMarkdown documents, and some types of figures and analysis that can be produced with R.
+
+<br>
+<br>
+
+# Set up
+
+## R and R studio 
+
+These should be installed together. R console runs the code and R studio is the user interface.
+<br>
+In R studio, click "File/New project" and follow the prompts. It is good practice to have at least 4 folders: Data, Scripts, Output, Images. After that, click "File/New file/RMarkDown and then .
+<br>
+
+
+## Header
+
+The first part of the RMarkdown code defines the properties of your web page. For example. `toc_depth: 5` means that there are 5 levels of subtitles displayed in the table of contents. `code_folding: hide` is to create buttons so that the reader can choose which code chunks they want to see. 
+
+## Packages
+
+Always include a list of the packages used in the code and even better to include the versions. Note I have already installed all these packages. And the code is used only to "activate them"
+
+```{r message=FALSE, warning=FALSE}
+# Import and process spectral data
+library(pavo) 
+
+# Plots
+library(ggplot2)
+
+# Tidy up
+library(dplyr)
+library(tidyr)
+
+# To avoid running issues
+library(here)
+
+# To insert images
+library(imager)
+```
+
+# Data wrangling
+
+Use dplyr and tidyverse to arrange your data. 
+
+mutate(): to create new columns, for example one column multiplied by another.
+
+group_by() and summary(): When you have multiple measurements of the same sample and you want only the mean and sd. 
+
+gather(): When you want to join two columns, one below the other. 
+
+spread(): when you want to separate one column into two according to groups.
+
+merge(): to join two data frames that have one column in common.
+
+# Spectral Data
+
+## Big files
+
+```{r message = FALSE, warning=FALSE}
+
+# Import data
+BeetD1<-getspec(
+  where = here::here("Data/Spectra"), # location
+  ext = "txt", # extension of the files
+  lim = c(300, 700), # limits
+  decimal = ".")
+
+BeetD2<-getspec(
+  where = here::here("Data/Spectra"), # location
+  ext = "txt", # extension of the files
+  lim = c(450, 700), # limits
+  decimal = ".")
+```
+*warning! models with this data are not reliable since we did not get values below 340nm
+
+
+```{r}
+# Change the names of the columns
+# first column, wavelength should always be "wl"
+names(BeetD2)<-c("wl","EpiLamp","CalFren","AnoAure","AnoLaeG")
+```
+
+
+```{r}
+# Fixing data
+BeetD1 <- BeetD1 %>%
+  as.rspec() %>% # convert to an r spec file
+  procspec(.,fixneg="zero") # Fix negatives
+
+BeetD2 <- BeetD2 %>% 
+  as.rspec() %>% # convert to an r spec file
+  procspec(.,fixneg="zero") # Fix negatives
+```
+
+note: a smoothing function can also be applied if needed with "opt" and the numbers "span".
+
+## Plots
+
+```{r}
+# Use this to explore the data
+explorespec(BeetD2)
+
+# Use this to produce a plot 
+ggplot(data = BeetD2) +
+  geom_line(aes(wl, AnoAure), col="blue")+
+  geom_line(aes(wl, EpiLamp), col="green")+
+  geom_line(aes(wl, CalFren), col="red")+
+  xlab("Wavelength (nm)")+
+  ylab("Reflectance (%)")+
+  theme_bw()
+
+# An extra rearrange of data is needed to automatically include a legend.
+
+```
+<br>
+## Spectral parameters
+<br>
+Sometimes it is useful to identify the maximum wavelength (H1), or the area under the curve (B1). The function summary calculates these and some other parameters from the curves:
+
+```{r}
+summary(BeetD2)
+```
+
+Note: We advocate for the use of the spectral location (i.e. The wavelength at which reflectance is half of the maximum, nm ) instead of the maximum wavelength (sometimes called Hue).
+<br>
+
+For more details on these parameters and formulae to automate their extraction see:https://lospinarozo.github.io/OpticalPropertiesNaturalMaterials_RCode2021/#Introduction and http://bitly.ws/ARIM 
+
+<br>
+## Visual models
+One last cool feature!
+
+With pavo it is possible to plot spectra in a colour space
+```{r}
+vis.example <- 
+  vismodel(BeetD1[,c(1,2)], # Spectra
+           visual="cie10", # Organism /  Human
+           illum = 'D65', # Illumination
+           vonkries = TRUE, # corrections
+           relative = FALSE, achromatic = 'none') # others
+
+vis.cols <- colspace(vis.example, space='ciexyz')
+
+plot(vis.cols, pch=21)
+
+```
+
+However, the parameters of the model may differ for each project, so this step requires more analysis.
+
+For more details about the models see: https://mran.microsoft.com/snapshot/2017-02-04/web/packages/pavo/vignettes/pavo-1_0.html
+
+# Microscopy Data 
+
+This is the method I use to count layers.
+
+## Tracing
+
+This is the original image
+
+```{r warning=FALSE, message=FALSE}
+im1<-load.image(here::here("Images/Lats.png"))
+plot(im1, axes = FALSE)
+```
+
+<br>
+
+I use a vector graphics software to trace the layers and produce this: 
+
+```{r}
+im2<-load.image(here::here("Images/LatsLines.png"))
+plot(im2, axes = FALSE)
+```
+
+And use plot profile in ImageJ to obtain the position of each line with reference to a starting point.
+
+<br>
+
+In this case, we will only consider one section of the png image. Import data.
+
+```{r}
+LatsP5L01<-read.csv(here::here("Data/Microscopy/A.laetus05LinesDataL1.csv")) 
+
+```
+
+This is what ImageJ produces:
+
+```{r}
+plot(LatsP5L01$Distance_.µm.,LatsP5L01$Gray_Value, type="l", xlab="Distance (um)", ylab="Gray value (0 to 255)")
+```
+
+## Extract
+
+But from that data set, we can extract the distance between the points at which the reflectance is closer to 250 (max. gray value)
+
+To do that, define a function to calculate the distance:
+
+*Not all the vector images are the same, so we need to use different parameters for the grey value and minimal distance between layers. 
+
+```{r}
+#Define a function to extract the layers from the files
+FindLayers2 <- function(Vector) {
+  # filter values of distance with intensity > 245
+  x<- filter(Vector, Gray_Value>245)
+  # find difference between consecutive distance values
+  xx <- diff(x$Distance_.µm.)[diff(x$Distance_.µm.)>0.0016] # adjust the  >xx distance for each spp:
+  Lines <- xx
+  Lines <- Lines*1000 # to nm since image measured in um
+  return(Lines)
+}
+```
+
+## Apply 
+
+```{r}
+LatsInn1 <- FindLayers2(LatsP5L01)[-1] # remove the first one because that is an artifact
+
+plot(seq(1:length(LatsInn1)), # a sequence of numbers
+     LatsInn1,# vector with the distances
+     pch=23,col="black", bg="violet", # shapes and colour
+     ylab="Number of the layer",  
+     xlab= "Thickness (nm)" 
+     )
+```
+
+<br>
+
+# Stats
+
+For example, I want to compare if the distance between the dots is the same in two beetles of the same species, different colour. In the following montage, the red beetle is on the left and the green is on the right. 
+
+```{r warning=FALSE, message=FALSE}
+im3<-load.image(here::here("Images/Montage.png"))
+plot(im3, axes = FALSE)
+```
+
+I combine the plugin "Analyse particles" with "NND" in ImageJ to obtain the data on the distance between the dots. 
+
+```{r}
+#Import
+AnSmaR <- read.csv(here::here("Data/Others/NNDAnoSmaR1.csv"))
+AnSmaG <- read.csv(here::here("Data/Others/NNDAnoSmaG1.csv"))
+
+NND<- c(AnSmaR$C1, AnSmaG$C1)
+Morph<- c(rep("Red",length(AnSmaR$C1)),
+          rep("Green",length(AnSmaG$C1)))
+
+Smaragdinus <- data.frame(NND,Morph)
+
+```
+
+Plot
+
+```{r}
+ggplot(Smaragdinus, aes(Morph,NND))+
+  geom_boxplot(bg="slateblue1", alpha=0.08, width=0.1)+
+  geom_jitter(pch=16,col="slateblue3", alpha=0.4, cex=2, 
+              width = 0.025)+
+  theme_bw()+
+  ylab("Nearest neighbour distance (um)")
+```
+
+t-test
+
+```{r}
+t.test(NND~Morph)
+```
+
+Interpretation: The centers of the hexagons are more separated in the green morph than in the red morph. 
